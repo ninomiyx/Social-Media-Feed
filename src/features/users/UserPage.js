@@ -3,17 +3,31 @@ import { useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 
 import { selectUserById } from './usersSlice'
-import { selectAllPosts } from '../posts/postsSlice'
+import { selectPostByUser } from '../posts/postsSlice'
 
 export const UserPage = ({ match }) => {
   const { userId } = match.params
 
   const user = useSelector(state => selectUserById(state, userId))
 
-  const postsForUser = useSelector(state => {
-    const allPosts = selectAllPosts(state)
-    return allPosts.filter(post => post.user === userId)
-  })
+  /**
+   * useSelector is used to extract data from the store
+   * useSelector will re-run every time an action is dispatched
+   * that will force UserPage component to re-render if we return a new reference value
+   * 
+   * 
+   * const postsForUser = useSelector(state => {
+   *   const allPosts = selectAllPosts(state)
+   *   return allPosts.filter(post => post.user === userId)
+   * })
+   * 
+   * `filter` method in useSelector
+   * will always return a new array even if the data hasn't changed
+   */
+  
+  // SO we need to change
+  const postsForUser = useSelector(state => selectPostByUser(state, userId))
+  
 
   const postTitles = postsForUser.map(post => (
     <li key={post.id}>

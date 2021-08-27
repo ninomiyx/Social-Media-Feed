@@ -11,7 +11,7 @@ import { PostAuthor } from './postAuthor';
 import { TimeAgo } from './TimeAgo';
 import { ReactionButtons } from './ReactionButtons';
 
-import { selectAllPosts, fetchPosts, selectPostById } from './postsSlice';
+import { fetchPosts, selectPostById, selectPostIds } from './postsSlice';
 
 let PostExcerpt = ({ postId }) => {
   const post = useSelector((state) => selectPostById(state, postId))
@@ -34,12 +34,15 @@ let PostExcerpt = ({ postId }) => {
 
 export const PostsList = () => {
   const dispatch = useDispatch()
-  const posts = useSelector(selectAllPosts)
+  const orderedPostIds = useSelector(selectPostIds)
 
   const postStatus = useSelector(state => state.posts.status)
   const error = useSelector(state => state.posts.error)
 
   // When fetch data, use useEffect hook
+  // every time after render PostList component
+  // dispatch useEffect
+  // if [postStatus, dispatch] is same as previous, then do not dispatch this time
   useEffect(() => {
     if (postStatus === 'idle') {
       dispatch(fetchPosts())
@@ -51,14 +54,8 @@ export const PostsList = () => {
   if (postStatus === 'loading') {
     content = <div className="loader">Loading...</div>
   } else if (postStatus === 'succeeded') {
-    // make a copy of posts(.slice()) 
-    // and sort the copy in reverse chronological order
-    const orderedPosts = posts
-      .slice()
-      .sort((a,b) => b.date.localeCompare(a.date))
-    
-    content = orderedPosts.map(post => (
-      <PostExcerpt key={post.id} postId={post.id} />
+    content = orderedPostIds.map(postId => (
+      <PostExcerpt key={postId} postId={postId} />
     ))
   } else if (postStatus === 'failed') {
     content = <div>{error}</div>

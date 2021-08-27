@@ -1,16 +1,25 @@
 // Create the React components to show the data,
 // which stores in Redux store, on the page.
 
-import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
+import { createSlice, createAsyncThunk, createSelector, createEntityAdapter } from "@reduxjs/toolkit";
 
 import { client } from '../../api/client'
 
-// the Redux store loads this ⬇️ when the app starts up
-const initialState = {
-  posts: [],
+// createEntityAdapter
+// provide a standardized way to store data
+// {ids: [], entities: {}}
+const postsAdapter = createEntityAdapter({
+  // sort the ids
+  sortComparer: (a, b) => b.date.localeCompare(a.date)
+})
+
+// the Redux store loads this ⬇ when the app starts up
+const initialState = postsAdapter.getInitialState({
   status: 'idle',
   error: null
-}
+})
+// ⬆ getInitialState, return {ids: [], entities: {}} 
+// now posts are in entities
 
 export const fetchPosts = createAsyncThunk('posts/fetchPosts', async () => {
   const response = await client.get('/fakeApi/posts')
@@ -34,7 +43,7 @@ const postsSlice = createSlice({
   reducers: {
     reactionAdded(state, action) {
       const { postId, reaction } = action.payload
-      const existingPost = state.posts.find(post => post.id === postId)
+      const existingPost = state.entities[postId]
       if (existingPost) {
         existingPost.reactions[reaction]++;
       }
@@ -42,7 +51,7 @@ const postsSlice = createSlice({
     
     postUpdated(state, action) {
       const {id, title, content} = action.payload
-      const existingPost = state.posts.find(post => post.id === id)
+      const existingPost = state.entities[id]
       if (existingPost) {
         existingPost.title = title
         existingPost.content = content
@@ -57,58 +66,41 @@ const postsSlice = createSlice({
     [fetchPosts.fulfilled]: (state, action) => {
       // change state.status and add fetched posts
       state.status = 'succeeded'
-      state.posts = state.posts.concat(action.payload)
+      // Add fetched posts to the array
+      // Use the `upsertMany` reducer as a mutating update utility
+      postsAdapter.upsertMany(state, action.payload)
+      // if items in action.payload already existing
+      // `upsertMany` will merge them base on matching IDs
     },
     [fetchPosts.rejected]: (state, action) => {
       state.status = 'failed'
       state.error = action.error.message
     },
-    [addNewPost.fulfilled]: (state, action) => {
-      // use `push` is safe, as React converts this mutation into
-      // immutable update by using Immer library
-      state.posts.push(action.payload)
-      // add new post object to current posts array
-    }
+    // Use the `addOne` reducer for the fulfilled case
+    [addNewPost.fulfilled]: postsAdapter.addOne
   }
 })
-
-
-/**
- * postAdded: {
-      reducer(state, action) {
-        state.posts.push(action.payload)
-      },
-      prepare(title, content, userId) {
-        return {
-          payload: {
-            id: nanoid(),
-            date: new Date().toISOString(),
-            title,
-            content,
-            user: userId,
-            reactions: {
-              thumbsUp: 0,
-              hooray: 0,
-              heart: 0,
-              rocket: 0,
-              eyes: 0
-            } 
-          }
-        }
-      }
-    },
- */
-
-
 
 export const { postUpdated, reactionAdded } = postsSlice.actions
 
 export default postsSlice.reducer
 
-export const selectAllPosts = state => state.posts.posts
+export const {
+  selectAll: selectAllPosts,
+  selectById: selectPostById,
+  selectIds: selectPostIds
+} = postsAdapter.getSelectors(state => state.posts)
 
-export const selectPostById = (state, postId) => 
-  state.posts.posts.find(post => post.id === postId)
+// createSelector
+// will create a memoized selector function
+// means it will save previous inputs and calculated result
+// if current inputs are the same
+// this function will return previous result instead of calculating it again
+export const selectPostByUser = createSelector(
+  [selectAllPosts, (state, userId) => userId],
+  (posts, userId) => posts.filter(post => post.user === userId)
+)
+// ⬆only calculate when posts OR userId have changed
 
 
 // Every time we create a new slice,
